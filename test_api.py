@@ -5,8 +5,13 @@ from unittest.mock import AsyncMock, patch
 import sys
 import types
 
-import Wh0Dini_AI.config as app_module
+import sys
+import os
 
+# Add the project root to sys.path so imports work
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+import config as app_module  # Adjust this if your app and client are in a different module
 @pytest.fixture(scope="module")
 def anyio_backend():
     return "asyncio"
