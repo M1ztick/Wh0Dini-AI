@@ -1,0 +1,20 @@
+# OpenAI Configuration
+OPENAI_API_KEY = "your_openai_api_key_here"
+
+# Server Configuration
+API_HOST = "0.0.0.0"
+API_PORT = "8000"
+ENVIRONMENT = "development"
+
+# Logging
+LOG_LEVEL = "INFO"
+
+# Security (set to true for production)
+REQUIRE_AUTH = "false"
+API_KEY = "your_secure_api_key_here"
+
+# CORS (comma-separated list of allowed origins)
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:8080"
+
+# Rate Limiting
+RATE_LIMIT_PER_MINUTE = "10"

@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+structlog
+slowapi
+openai
+tiktoken
+python-dotenv
