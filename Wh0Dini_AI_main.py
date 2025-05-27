@@ -1,0 +1,304 @@
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, BaseSettings, Field
+from typing import List
+import uuid
+import structlog # type: ignore
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from openai import AsyncOpenAI
+import os
+import tiktoken
+from datetime import datetime
+
+# Configuration Management
+class Settings(BaseSettings):
+    openai_api_key: str
+    model_name: str = "gpt-4o-mini"
+    max_tokens: int = 500
+    rate_limit: str = "10/minute"
+    max_message_length: int = 4000
+    max_conversation_tokens: int = 3000
+    temperature: float = 0.2
+    
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+
+# Initialize OpenAI client (modern async client)
+client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+# System prompt (moved from config.py)
+SYSTEM_PROMPT = """
+You are Wh0Dini-AI, a privacy-first, user-centric AI assistant.
+
+Core Principles:
+- Always prioritize user privacy: never store or log personal data
+- Communicate clearly, respectfully, and empathetically
+- Provide helpful, relevant, and safe information
+- Avoid harmful, offensive, or biased content
+- Encourage positive and ethical use
+- Be concise but thorough in responses
+- Acknowledge limitations honestly
+
+Remember: You're designed to be helpful while maintaining the highest ethical standards.
+"""
+
+# Configure structured logging
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
+
+logger = structlog.get_logger()
+
+# Rate limiting setup
+limiter = Limiter(key_func=get_remote_address)
+
+# FastAPI app initialization
+app = FastAPI(
+    title="Wh0Dini-AI - User-first, Privacy-focused AI Assistant",
+    description="A privacy-first FastAPI chatbot assistant powered by GPT-4o-mini that delivers intelligent conversations without compromising user data or identity.",
+    version="2.0.0"
+)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Pydantic Models
+class Message(BaseModel):
+    role: str = Field(..., description="Role: 'user', 'assistant', or 'system'")
+    content: str = Field(..., description="Message content")
+
+class ChatRequest(BaseModel):
+    messages: List[Message] = Field(..., description="Conversation history")
+    stream: bool = Field(default=False, description="Enable streaming response")
+
+class ChatResponse(BaseModel):
+    response: str = Field(..., description="Wh0Dini-AI's reply")
+    request_id: str = Field(..., description="Unique request identifier")
+
+# Utility Functions (Fixed)
+def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
+    """Count tokens in text using tiktoken."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+        return len(encoding.encode(text))
+    except Exception:
+        # Fallback estimation: ~4 chars per token
+        logger.warning("Token counting failed, using estimation")
+        return len(text) // 4
+
+def trim_conversation(messages: List[Message], max_tokens: int = 3000) -> List[Message]:
+    """Trim conversation to stay within token limits while preserving context."""
+    total_tokens = 0
+    trimmed_messages = []
+    
+    # Process messages in reverse to keep most recent
+    for message in reversed(messages):
+        message_tokens = count_tokens(message.content)
+        if total_tokens + message_tokens > max_tokens and len(trimmed_messages) > 0:
+            break
+        trimmed_messages.insert(0, message)
+        total_tokens += message_tokens
+    
+    return trimmed_messages
+
+def validate_message(message: Message) -> None:
+    """Validate individual message."""
+    if message.role not in ("user", "assistant"):
+        raise HTTPException(status_code=400, detail="Invalid message role")
+    
+    if len(message.content) > settings.max_message_length:
+        raise HTTPException(status_code=400, detail="Message too long")
+    
+    if not message.content.strip():
+        raise HTTPException(status_code=400, detail="Empty message content")
+
+# Main Chat Endpoint (Fixed)
+@app.post("/chat", response_model=ChatResponse)
+@limiter.limit(settings.rate_limit)
+async def chat_endpoint(request: Request, chat_request: ChatRequest):
+    """Enhanced chat endpoint with improved error handling, validation, and logging."""
+    request_id = str(uuid.uuid4())
+    
+    try:
+        logger.info(
+            "chat_request_received",
+            request_id=request_id,
+            message_count=len(chat_request.messages),
+            client_ip=get_remote_address(request)
+        )
+        
+        if not chat_request.messages:
+            raise HTTPException(status_code=400, detail="No messages provided")
+        
+        for message in chat_request.messages:
+            validate_message(message)
+        
+        trimmed_messages = trim_conversation(
+            chat_request.messages, 
+            settings.max_conversation_tokens
+        )
+        
+        openai_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        for msg in trimmed_messages:
+            openai_messages.append({"role": msg.role, "content": msg.content})
+        
+        # Use modern async client
+        completion = await client.chat.completions.create(
+            model=settings.model_name,
+            messages=openai_messages,
+            temperature=settings.temperature,
+            max_tokens=settings.max_tokens,
+            user=request_id
+        )
+        
+        reply = completion.choices[0].message.content.strip()
+        
+        logger.info(
+            "chat_response_generated",
+            request_id=request_id,
+            response_length=len(reply),
+            tokens_used=completion.usage.total_tokens if completion.usage else 0
+        )
+        
+        return ChatResponse(response=reply, request_id=request_id)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "chat_error",
+            request_id=request_id,
+            error_type=type(e).__name__,
+            error_message=str(e)
+        )
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# Streaming Chat Endpoint (Fixed)
+@app.post("/chat/stream")
+@limiter.limit(settings.rate_limit)
+async def chat_stream(request: Request, chat_request: ChatRequest):
+    """Streaming chat endpoint for real-time responses."""
+    request_id = str(uuid.uuid4())
+    
+    async def generate_stream():
+        try:
+            if not chat_request.messages:
+                yield "data: Error: No messages provided\n\n"
+                return
+            
+            for message in chat_request.messages:
+                validate_message(message)
+            
+            trimmed_messages = trim_conversation(
+                chat_request.messages,
+                settings.max_conversation_tokens
+            )
+            
+            openai_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            for msg in trimmed_messages:
+                openai_messages.append({"role": msg.role, "content": msg.content})
+            
+            stream = await client.chat.completions.create(
+                model=settings.model_name,
+                messages=openai_messages,
+                temperature=settings.temperature,
+                max_tokens=settings.max_tokens,
+                stream=True,
+                user=request_id
+            )
+            
+            async for chunk in stream:
+                if chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    yield f"data: {content}\n\n"
+            
+            yield "data: [DONE]\n\n"
+            
+        except Exception as e:
+            logger.error("stream_error", request_id=request_id, error=str(e))
+            yield f"data: Error: {str(e)}\n\n"
+    
+    try:
+        logger.info("stream_request_started", request_id=request_id)
+        
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/plain",
+            headers={"X-Request-ID": request_id}
+        )
+        
+    except Exception as e:
+        logger.error("stream_setup_error", request_id=request_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Stream setup failed")
+
+# Health Check (Fixed)
+@app.get("/health")
+async def health_check():
+    """Comprehensive health check including OpenAI connectivity."""
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": "2.0.0",
+        "services": {}
+    }
+    
+    try:
+        # Test OpenAI connectivity
+        models = await client.models.list()
+        health_status["services"]["openai"] = {
+            "status": "connected",
+            "model": settings.model_name
+        }
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["services"]["openai"] = {
+            "status": "disconnected",
+            "error": str(e)
+        }
+    
+    return health_status
+
+@app.get("/")
+async def root():
+    return {
+        "name": "Wh0Dini-AI",
+        "version": "2.0.0",
+        "description": "Privacy-first AI assistant that makes your data disappear like magic",
+        "endpoints": {
+            "chat": "/chat",
+            "stream": "/chat/stream",
+            "health": "/health",
+            "docs": "/docs"
+        }
+    }
+
+if __name__ == "__main__":
+    try:
+        import uvicorn
+        uvicorn.run(
+            "Wh0Dini_AI_main:app",  # Fixed module reference
+            host="0.0.0.0",
+            port=8000,
+            reload=True  # Set to False for production
+        )
+    except ImportError:
+        print("Error: uvicorn is not installed. Please install it with: pip install uvicorn[standard]")
+        exit(1)
