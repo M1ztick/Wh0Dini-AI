@@ -5,13 +5,12 @@ from unittest.mock import AsyncMock, patch
 import sys
 import types
 
-import sys
 import os
 
 # Add the project root to sys.path so imports work
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-import config as app_module  # Adjust this if your app and client are in a different module
+from app import app as app_module  # type: ignore # Use relative import for app.py in the same directory
 @pytest.fixture(scope="module")
 def anyio_backend():
     return "asyncio"
