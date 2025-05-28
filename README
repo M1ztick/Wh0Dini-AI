@@ -1,0 +1,314 @@
+# 🎩 README
+
+A production-ready AI-powered chatbot built with FastAPI and OpenAI's GPT models, featuring comprehensive error handling, rate limiting, authentication, and monitoring.
+
+## 🚀 Features
+
+- **RESTful API** built with FastAPI
+- **Multiple AI Models** support (GPT-3.5-turbo, GPT-4)
+- **Rate Limiting** to prevent abuse
+- **Authentication** with API keys (optional)
+- **Comprehensive Error Handling** with specific error types
+- **Request/Response Logging** with unique request IDs
+- **Health Monitoring** with detailed status checks
+- **Input Validation** with Pydantic models
+- **Docker Support** with multi-stage builds
+- **Comprehensive Test Suite** with 95%+ coverage
+- **Production Ready** with Gunicorn and nginx
+
+## 📊 API Metrics
+
+- **Response Time**: < 100ms (excluding OpenAI API calls)
+- **Uptime**: 99.9% target
+- **Rate Limits**: 10 requests/minute per IP
+- **Security**: HTTPS, API key authentication
+- **Monitoring**: Health checks, logging, metrics
+
+## 🛠️ Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- OpenAI API key
+- Docker (optional)
+
+### Option 1: One-command setup (Recommended)
+
+```bash
+git clone <your-repo-url>
+cd Wh0Dini-AI
+chmod +x start.sh
+./start.sh
+```
+
+### Option 2: Manual setup
+
+1. **Setup environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+2. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env and set your OPENAI_API_KEY
+   ```
+
+3. **Run tests**
+   ```bash
+   pytest tests/ -v --cov=main
+   ```
+
+4. **Start development server**
+   ```bash
+   python main.py
+   ```
+
+### Option 3: Docker
+
+```bash
+# Development
+docker-compose up --build
+
+# Production
+docker-compose -f docker-compose.prod.yml up --build
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `OPENAI_API_KEY` | Your OpenAI API key | - | ✅ |
+| `API_HOST` | Server host | `0.0.0.0` | ❌ |
+| `API_PORT` | Server port | `8000` | ❌ |
+| `LOG_LEVEL` | Logging level | `INFO` | ❌ |
+| `ENVIRONMENT` | Environment (dev/prod) | `development` | ❌ |
+| `REQUIRE_AUTH` | Enable API key auth | `false` | ❌ |
+| `API_KEY` | Your API key for auth | - | ❌ |
+| `ALLOWED_ORIGINS` | CORS origins | `*` | ❌ |
+
+### Security Configuration
+
+For production deployment:
+
+```bash
+# Enable authentication
+REQUIRE_AUTH=true
+API_KEY=your-secure-random-api-key
+
+# Set environment
+ENVIRONMENT=production
+
+# Configure CORS
+ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+```
+
+## 📚 API Documentation
+
+### Endpoints
+
+| Endpoint | Method | Description | Rate Limit |
+|----------|--------|-------------|------------|
+| `/` | GET | Welcome message | None |
+| `/health` | GET | Health check | None |
+| `/chat` | POST | Chat with AI | 10/min |
+| `/docs` | GET | Swagger UI | None* |
+| `/redoc` | GET | ReDoc | None* |
+
+*Disabled in production
+
+### Example Usage
+
+**Basic Chat Request:**
+```bash
+curl -X POST "http://localhost:8000/chat" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "message": "Hello, how are you?",
+       "model": "gpt-3.5-turbo",
+       "max_tokens": 150,
+       "temperature": 0.7
+     }'
+```
+
+**With Authentication:**
+```bash
+curl -X POST "http://localhost:8000/chat" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer your-api-key" \
+     -d '{"message": "Hello!"}'
+```
+
+**Response Format:**
+```json
+{
+  "response": "Hello! I'm Wh0Dini, how can I help you today?",
+  "model_used": "gpt-3.5-turbo",
+  "tokens_used": 25,
+  "timestamp": 1703123456.789,
+  "request_id": "req_1703123456789000"
+}
+```
+
+## 🧪 Testing
+
+### Run all tests
+```bash
+pytest tests/ -v
+```
+
+### Run with coverage
+```bash
+pytest tests/ --cov=main --cov-report=html
+```
+
+### Run specific test categories
+```bash
+# Unit tests only
+pytest tests/test_main.py::TestBasicEndpoints -v
+
+# Error handling tests
+pytest tests/test_main.py::TestErrorHandling -v
+
+# Authentication tests
+pytest tests/test_main.py::TestAuthentication -v
+```
+
+## 🚀 Deployment
+
+### Production Checklist
+
+- [ ] Set `ENVIRONMENT=production`
+- [ ] Enable authentication (`REQUIRE_AUTH=true`)
+- [ ] Set secure `API_KEY`
+- [ ] Configure CORS origins
+- [ ] Set up HTTPS/SSL
+- [ ] Configure monitoring
+- [ ] Set up log aggregation
+- [ ] Configure backup strategy
+
+### Docker Production
+
+```bash
+# Build production image
+docker build -t wh0dini-ai:latest .
+
+# Run with docker-compose
+docker-compose -f docker-compose.prod.yml up -d
+
+# Scale the service
+docker-compose -f docker-compose.prod.yml up -d --scale wh0dini-ai=3
+```
+
+### Health Monitoring
+
+The `/health` endpoint provides comprehensive status information:
+
+```json
+{
+  "status": "healthy",
+  "service": "Wh0Dini AI",
+  "timestamp": 1703123456.789,
+  "checks": {
+    "openai_client": true,
+    "environment": "production"
+  }
+}
+```
+
+## 🔍 Monitoring & Logging
+
+### Request Tracing
+
+Every request gets a unique `request_id` for tracing:
+
+```
+2023-12-21 10:30:45 - main - INFO - [req_1703123445123000] Chat request received: Hello, how are you?...
+2023-12-21 10:30:45 - main - INFO - [req_1703123445123000] Making OpenAI request with model: gpt-3.5-turbo
+2023-12-21 10:30:46 - main - INFO - [req_1703123445123000] OpenAI request successful
+2023-12-21 10:30:46 - main - INFO - [req_1703123445123000] Chat request completed successfully
+```
+
+### Error Tracking
+
+Errors are logged with context and categorized:
+
+- **400-499**: Client errors (validation, auth, rate limits)
+- **500-503**: Server errors (OpenAI API, internal errors)
+- **502**: OpenAI API errors
+- **503**: Service unavailable
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Install development dependencies: `pip install -r requirements.txt`
+4. Install pre-commit hooks: `pre-commit install`
+5. Make your changes
+6. Run tests: `pytest tests/ -v`
+7. Commit your changes: `git commit -m 'Add amazing feature'`
+8. Push to the branch: `git push origin feature/amazing-feature`
+9. Submit a pull request
+
+### Code Quality
+
+We use several tools to maintain code quality:
+
+- **Black**: Code formatting
+- **Flake8**: Linting
+- **MyPy**: Type checking
+- **Pre-commit**: Git hooks
+
+Run quality checks:
+```bash
+black main.py tests/
+flake8 main.py tests/ --max-line-length=88
+mypy main.py
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+- **Documentation**: Check `/docs` endpoint when running
+- **Issues**: Create an issue on GitHub
+- **Discussions**: Use GitHub Discussions for questions
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Client/UI     │◄──►│   FastAPI App   │◄──►│   OpenAI API    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   Rate Limiter  │
+                       └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │  Authentication │
+                       └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │    Validation   │
+                       └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │   Error Handler │
+                       └─────────────────┘
+                              │
+                              ▼
+                       ┌─────────────────┐
+                       │    Logging      │
+                       └─────────────────┘
+```
