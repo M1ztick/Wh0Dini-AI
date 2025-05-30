@@ -1,0 +1,30 @@
+[tool.pytest.ini_options]
+testpaths = [
+    ".",
+]
+python_files = [
+    "test_*.py",
+    "*_test.py",
+]
+python_functions = [
+    "test_*",
+]
+python_classes = [
+    "Test*",
+]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+asyncio_mode = "auto"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
