@@ -6,3 +6,7 @@ slowapi
 openai
 tiktoken
 python-dotenv
+pytest
+pytest-asyncio
+pytest-cov
+httpx
