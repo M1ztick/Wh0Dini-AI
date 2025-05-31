@@ -1,0 +1,29 @@
+# Development dependencies for Wh0Dini-AI
+# These are additional tools for development, testing, and code quality
+
+# Code formatting and linting
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# Pre-commit hooks
+pre-commit>=3.0.0
+
+# Additional testing tools
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0  # For parallel test execution
+pytest-benchmark>=4.0.0  # For performance testing
+
+# Development utilities
+watchdog>=3.0.0  # For file watching during development
+python-dotenv>=1.0.0  # Already in main requirements but useful for dev
+ipython>=8.0.0  # Better Python REPL
+jupyterlab>=4.0.0  # For notebook development
+
+# Documentation
+mkdocs>=1.5.0
+mkdocs-material>=9.0.0
+
+# Type stubs
+types-requests>=2.31.0
