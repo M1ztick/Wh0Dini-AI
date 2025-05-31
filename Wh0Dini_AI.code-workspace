@@ -2,20 +2,97 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../.codespaces"
 		}
 	],
 	"settings": {
 		"inlineChat.finishOnType": true,
 		"inlineChat.hideOnRequest": true,
 		"inlineChat.lineEmptyHint": true,
-		"inlineChat.enableV2": true
+		"inlineChat.enableV2": true,
+		"python.defaultInterpreterPath": "/usr/local/bin/python",
+		"python.linting.enabled": true,
+		"python.linting.pylintEnabled": true,
+		"python.formatting.provider": "black",
+		"python.testing.pytestEnabled": true,
+		"python.testing.pytestArgs": [
+			"."
+		],
+		"editor.formatOnSave": true,
+		"editor.codeActionsOnSave": {
+			"source.organizeImports": "explicit"
+		},
+		"files.exclude": {
+			"**/__pycache__": true,
+			"**/*.pyc": true,
+			"**/.pytest_cache": true,
+			"**/.coverage": true
+		}
 	},
 	"extensions": {
 		"recommendations": [
-			"ms-windows-ai-studio.windows-ai-studio"
+			"ms-python.python",
+			"ms-python.black-formatter",
+			"ms-python.isort",
+			"ms-python.pylint",
+			"ms-toolsai.jupyter",
+			"humao.rest-client",
+			"ms-vscode.vscode-json",
+			"redhat.vscode-yaml"
+		]
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "FastAPI Dev Server",
+				"type": "debugpy",
+				"request": "launch",
+				"program": "main.py",
+				"console": "integratedTerminal",
+				"cwd": "${workspaceFolder}",
+				"env": {
+					"PYTHONPATH": "${workspaceFolder}"
+				}
+			}
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Run FastAPI Server",
+				"type": "shell",
+				"command": "python",
+				"args": [
+					"main.py"
+				],
+				"group": "build",
+				"presentation": {
+					"echo": true,
+					"reveal": "always",
+					"focus": false,
+					"panel": "new"
+				},
+				"problemMatcher": []
+			},
+			{
+				"label": "Run Tests",
+				"type": "shell",
+				"command": "pytest",
+				"args": [
+					"-v",
+					"--cov=.",
+					"--cov-report=html"
+				],
+				"group": "test",
+				"presentation": {
+					"echo": true,
+					"reveal": "always",
+					"focus": false,
+					"panel": "new"
+				},
+				"problemMatcher": []
+			}
 		]
 	}
 }

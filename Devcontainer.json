@@ -1,17 +1,49 @@
 {
-    "name": "Wh0Dini-AI FastAPI",
+    "name": "Wh0Dini-AI FastAPI Development",
     "image": "mcr.microsoft.com/devcontainers/python:3.11",
     "features": {
-        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "18"
+        }
     },
     "postCreateCommand": "pip install -r requirements.txt",
-    "forwardPorts": [8000],
+    "forwardPorts": [
+        8000
+    ],
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-python.python",
-                "ms-python.fastapi"
-            ]
+                "ms-python.flake8",
+                "ms-python.pylint",
+                "ms-python.black-formatter",
+                "ms-python.isort",
+                "ms-toolsai.jupyter",
+                "ms-vscode.vscode-json",
+                "humao.rest-client",
+                "redhat.vscode-yaml"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": true,
+                "python.formatting.provider": "black",
+                "python.formatting.blackArgs": [
+                    "--line-length=88"
+                ],
+                "python.sortImports.args": [
+                    "--profile",
+                    "black"
+                ],
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": true
+                }
+            }
         }
-    }
+    },
+    "mounts": [
+        "source=${localWorkspaceFolder}/.env,target=/workspaces/Wh0Dini-AI/.env,type=bind,consistency=cached"
+    ]
 }
