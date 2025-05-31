@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, BaseSettings, Field
+from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings
 from typing import List
 import uuid
 import structlog # type: ignore
@@ -10,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from openai import AsyncOpenAI
 import os
 import tiktoken
+import json
 from datetime import datetime
 
 # Configuration Management
@@ -21,6 +24,16 @@ class Settings(BaseSettings):
     max_message_length: int = 4000
     max_conversation_tokens: int = 3000
     temperature: float = 0.2
+    
+    # Additional fields from .env file
+    api_host: str = "0.0.0.0"
+    api_port: str = "8000"
+    environment: str = "development"
+    log_level: str = "INFO"
+    require_auth: str = "false"
+    api_key: str = "your_secure_api_key_here"
+    allowed_origins: str = "http://localhost:3000,http://localhost:8080"
+    rate_limit_per_minute: str = "10"
     
     class Config:
         env_file = ".env"
@@ -76,6 +89,9 @@ app = FastAPI(
     description="A privacy-first FastAPI chatbot assistant powered by GPT-4o-mini that delivers intelligent conversations without compromising user data or identity.",
     version="2.0.0"
 )
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -228,7 +244,7 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
             async for chunk in stream:
                 if chunk.choices[0].delta and chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
-                    yield f"data: {content}\n\n"
+                    yield f"data: {json.dumps({'content': content})}\n\n"
             
             yield "data: [DONE]\n\n"
             
@@ -289,6 +305,15 @@ async def root():
             "docs": "/docs"
         }
     }
+
+@app.get("/chat-ui", response_class=HTMLResponse)
+async def chat_ui():
+    """Serve the web chat interface"""
+    try:
+        with open("static/index.html", "r") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Chat UI not found")
 
 if __name__ == "__main__":
     try:

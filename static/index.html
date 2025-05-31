@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wh0Dini-AI - Privacy-First AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-magic"></i>
+                <h1>Wh0Dini-AI</h1>
+            </div>
+            <div class="tagline">Privacy-First AI Assistant</div>
+            <div class="status-indicator">
+                <span id="status-dot" class="status-dot"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Chat Container -->
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message welcome-message">
+                    <div class="message-avatar">
+                        <i class="fas fa-magic"></i>
+                    </div>
+                    <div class="message-content">
+                        <div class="message-text">
+                            🎭 Welcome to Wh0Dini-AI! I'm your privacy-first AI assistant. 
+                            Your conversations disappear like magic - no data is stored or logged. 
+                            How can I help you today?
+                        </div>
+                        <div class="message-time" id="welcomeTime"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="Ask me anything... (your privacy is protected)"
+                        rows="1"
+                    ></textarea>
+                    <button id="sendButton" class="send-button" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="input-footer">
+                    <div class="privacy-notice">
+                        <i class="fas fa-shield-alt"></i>
+                        Your messages are not stored or logged
+                    </div>
+                    <div class="controls">
+                        <button id="clearButton" class="control-button">
+                            <i class="fas fa-trash"></i>
+                            Clear Chat
+                        </button>
+                        <button id="streamToggle" class="control-button active">
+                            <i class="fas fa-stream"></i>
+                            Streaming: ON
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="loading-spinner">
+                <i class="fas fa-magic spinning"></i>
+                <p>Wh0Dini-AI is thinking...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/docs" target="_blank">
+                    <i class="fas fa-book"></i>
+                    API Docs
+                </a>
+                <a href="/health" target="_blank">
+                    <i class="fas fa-heartbeat"></i>
+                    Health Check
+                </a>
+                <a href="https://github.com" target="_blank">
+                    <i class="fab fa-github"></i>
+                    GitHub
+                </a>
+            </div>
+            <div class="footer-info">
+                <span>Wh0Dini-AI v2.0.0</span>
+                <span>•</span>
+                <span>Privacy-First Design</span>
+                <span>•</span>
+                <span>No Data Storage</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
