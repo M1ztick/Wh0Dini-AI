@@ -8,12 +8,12 @@ import structlog  # type: ignore
 import tiktoken
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
@@ -139,7 +139,25 @@ if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Custom rate limit exception handler
+
+
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Custom handler for rate limit exceeded errors."""
+    response = JSONResponse(
+        status_code=429,
+        content={
+            "error": "Rate limit exceeded",
+            "detail": f"Request limit exceeded: {exc.detail}",
+            "retry_after": getattr(exc, 'retry_after', None)
+        }
+    )
+    if hasattr(exc, 'retry_after') and exc.retry_after:
+        response.headers["Retry-After"] = str(exc.retry_after)
+    return response
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 # Pydantic Models
 
