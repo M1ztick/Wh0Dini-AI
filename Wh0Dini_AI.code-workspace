@@ -26,7 +26,8 @@
 			"**/*.pyc": true,
 			"**/.pytest_cache": true,
 			"**/.coverage": true
-		}
+		},
+		"makefile.configureOnOpen": false
 	},
 	"extensions": {
 		"recommendations": [

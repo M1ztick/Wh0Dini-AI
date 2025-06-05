@@ -1,14 +1,15 @@
+import asyncio
 import json
 import os
 import uuid
 from datetime import datetime
-from typing import List
+from typing import Any, AsyncGenerator, Dict, List
 
 import structlog  # type: ignore
 import tiktoken
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
@@ -20,28 +21,85 @@ from slowapi.util import get_remote_address
 
 # Configuration Management
 class Settings(BaseSettings):
+    """
+    Configuration settings for the Wh0Dini-AI application.
+
+    This class manages all application configuration using Pydantic BaseSettings,
+    which automatically loads values from environment variables and .env files.
+
+    Core AI Settings:
+        openai_api_key (str): OpenAI API key for GPT model access. Required.
+        model_name (str): OpenAI model to use. Default: "gpt-4o-mini"
+        max_tokens (int): Maximum tokens per AI response. Default: 500
+        temperature (float): AI response creativity (0.0-2.0). Default: 0.2
+        max_message_length (int): Maximum length for individual messages. Default: 4000
+        max_conversation_tokens (int): Token limit for conversation context. Default: 3000
+
+    API Server Settings:
+        api_host (str): Server bind address. Default: "0.0.0.0"
+        api_port (int): Server port. Default: 8000
+        allowed_origins (List[str]): CORS allowed origins for frontend access
+        require_auth (bool): Enable API authentication. Default: False
+        api_key (str): API key for authentication when required
+
+    Rate Limiting & Performance:
+        rate_limit (str): Rate limit per client. Default: "10/minute"
+        rate_limit_per_minute (int): Numeric rate limit value. Default: 10
+
+    Development Settings:
+        environment (str): Runtime environment. Default: "development"
+        log_level (str): Logging verbosity. Default: "INFO"
+        debug (bool): Enable debug mode. Default: True
+        reload (bool): Enable auto-reload for development. Default: True
+
+    Usage:
+        The class automatically loads configuration from:
+        1. Environment variables (highest priority)
+        2. .env file in project root
+        3. Default values (lowest priority)
+
+        Required environment variables:
+        - OPENAI_API_KEY: Your OpenAI API key
+
+    Example .env file:
+        OPENAI_API_KEY=sk-your-key-here
+        MODEL_NAME=gpt-4o-mini
+        API_PORT=8000
+        DEBUG=true
+
+    Raises:
+        ValueError: If required settings are missing or invalid
+        FileNotFoundError: If .env file is specified but not found
+        PermissionError: If .env file cannot be read
+
+    Note:
+        Call validate_settings() after initialization to ensure
+        all required configuration is present and valid.
+    """
+
     openai_api_key: str = ""  # Make it optional initially
     model_name: str = "gpt-4o-mini"
     max_tokens: int = 500
     rate_limit: str = "10/minute"
     max_message_length: int = 4000
     max_conversation_tokens: int = 3000
-    temperature: float = 0.2
-
-    # Additional fields from .env file
-    api_host: str = "0.0.0.0"
+    temperature: float = 0.2    # Security: Bind to localhost by default for security
+    api_host: str = "127.0.0.1"
     api_port: int = 8000
     environment: str = "development"
     log_level: str = "INFO"
     require_auth: bool = False
     api_key: str = "your_secure_api_key_here"
-    allowed_origins: List[str] = ["http://localhost:3000",
-                                  "http://localhost:8080", "http://localhost:8000"]
+    allowed_origins: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://localhost:8000",
+    ]
     rate_limit_per_minute: int = 10
     debug: bool = True
     reload: bool = True
 
-    class Config:
+    class ConfigDict:
         env_file = ".env"
 
     def validate_settings(self) -> None:
@@ -67,16 +125,31 @@ except ValueError as e:
     print("2. Add: OPENAI_API_KEY=your_actual_api_key_here")
     print("3. Get your API key from: https://platform.openai.com/api-keys")
     exit(1)
-except Exception as e:
-    print(f"Settings initialization failed: {e}")
+except FileNotFoundError as e:
+    print(f"Settings file not found: {e}")
     exit(1)
+except PermissionError as e:
+    print(f"Permission error reading settings: {e}")
+    exit(1)
+
+# FastAPI app initialization
+app = FastAPI(
+    title="Wh0Dini-AI - User-first, Privacy-focused AI Assistant",
+    description="A privacy-first FastAPI chatbot assistant powered by GPT-4o-mini that delivers intelligent conversations without compromising user data or identity.",
+    version="2.0.0",
+)
 
 # Initialize OpenAI client (modern async client) with error handling
 try:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
-except Exception as e:
-    print(f"Failed to initialize OpenAI client: {e}")
+except ValueError as e:
+    print(f"Invalid API key format: {e}")
     exit(1)
+except TypeError as e:
+    print(f"API key type error: {e}")
+    exit(1)
+app.state.client = client
+client = app.state.client
 
 # System prompt (moved from config.py)
 SYSTEM_PROMPT = """
@@ -105,7 +178,7 @@ structlog.configure(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer(),
     ],
     context_class=dict,
     logger_factory=structlog.stdlib.LoggerFactory(),
@@ -118,12 +191,24 @@ logger = structlog.get_logger()
 # Rate limiting setup
 limiter = Limiter(key_func=get_remote_address)
 
-# FastAPI app initialization
-app = FastAPI(
-    title="Wh0Dini-AI - User-first, Privacy-focused AI Assistant",
-    description="A privacy-first FastAPI chatbot assistant powered by GPT-4o-mini that delivers intelligent conversations without compromising user data or identity.",
-    version="2.0.0"
-)
+# Rate limit exception handler
+
+
+async def _rate_limit_exceeded_handler(
+    request: Request, exc: RateLimitExceeded
+) -> HTMLResponse:
+    """Handle rate limit exceeded exceptions."""
+    response_data: Dict[str, Any] = {
+        "error": "Rate limit exceeded",
+        "detail": f"Rate limit: {exc.detail}" if exc.detail else "Rate limit exceeded",
+        "retry_after": getattr(exc, "retry_after", 60),
+    }
+    return HTMLResponse(
+        content=json.dumps(response_data),
+        status_code=429,
+        headers={"Content-Type": "application/json"},
+    )
+
 
 # Add CORS middleware
 app.add_middleware(
@@ -139,25 +224,7 @@ if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.state.limiter = limiter
-
-# Custom rate limit exception handler
-
-
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    """Custom handler for rate limit exceeded errors."""
-    response = JSONResponse(
-        status_code=429,
-        content={
-            "error": "Rate limit exceeded",
-            "detail": f"Request limit exceeded: {exc.detail}",
-            "retry_after": getattr(exc, 'retry_after', None)
-        }
-    )
-    if hasattr(exc, 'retry_after') and exc.retry_after:
-        response.headers["Retry-After"] = str(exc.retry_after)
-    return response
-
-app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Pydantic Models
 
@@ -175,6 +242,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str = Field(..., description="Wh0Dini-AI's reply")
     request_id: str = Field(..., description="Unique request identifier")
+
 
 # Utility Functions (Fixed)
 
@@ -203,7 +271,7 @@ def count_tokens(text: str, model: str = "gpt-4o-mini") -> int:
 def trim_conversation(messages: List[Message], max_tokens: int = 3000) -> List[Message]:
     """Trim conversation to stay within token limits while preserving context."""
     total_tokens = 0
-    trimmed_messages = []
+    trimmed_messages: List[Message] = []
 
     # Process messages in reverse to keep most recent
     for message in reversed(messages):
@@ -230,6 +298,7 @@ def validate_message(message: Message) -> None:
     if not message.content.strip():
         raise HTTPException(status_code=400, detail="Empty message content")
 
+
 # Main Chat Endpoint (Fixed)
 
 
@@ -244,37 +313,38 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
             "chat_request_received",
             request_id=request_id,
             message_count=len(chat_request.messages),
-            client_ip=get_remote_address(request)
+            client_ip=get_remote_address(request),
         )
 
         if not chat_request.messages:
             raise HTTPException(status_code=400, detail="No messages provided")
-
         for message in chat_request.messages:
             validate_message(message)
 
         trimmed_messages = trim_conversation(
-            chat_request.messages,
-            settings.max_conversation_tokens
+            chat_request.messages, settings.max_conversation_tokens
         )
 
-        openai_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        openai_messages: List[Dict[str, str]] = [
+            {"role": "system", "content": SYSTEM_PROMPT}
+        ]
         for msg in trimmed_messages:
             openai_messages.append({"role": msg.role, "content": msg.content})
 
         # Use modern async client
         completion = await client.chat.completions.create(
             model=settings.model_name,
-            messages=openai_messages,
+            messages=openai_messages,  # type: ignore
             temperature=settings.temperature,
             max_tokens=settings.max_tokens,
-            user=request_id
+            user=request_id,
         )
 
         # Add null safety checks
         if not completion or not completion.choices or len(completion.choices) == 0:
             raise HTTPException(
-                status_code=500, detail="Invalid response from AI service")
+                status_code=500, detail="Invalid response from AI service"
+            )
 
         message_content = completion.choices[0].message.content
         if message_content is None:
@@ -286,21 +356,47 @@ async def chat_endpoint(request: Request, chat_request: ChatRequest):
             "chat_response_generated",
             request_id=request_id,
             response_length=len(reply),
-            tokens_used=completion.usage.total_tokens if completion.usage else 0
+            tokens_used=completion.usage.total_tokens if completion.usage else 0,
         )
 
         return ChatResponse(response=reply, request_id=request_id)
-
     except HTTPException:
         raise
+    except ValueError as e:
+        logger.error(
+            "chat_validation_error",
+            request_id=request_id,
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise HTTPException(status_code=400, detail="Invalid request data") from e
+    except ConnectionError as e:
+        logger.error(
+            "chat_connection_error",
+            request_id=request_id,
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise HTTPException(
+            status_code=503, detail="Service temporarily unavailable"
+        ) from e
+    except TimeoutError as e:
+        logger.error(
+            "chat_timeout_error",
+            request_id=request_id,
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise HTTPException(status_code=504, detail="Request timeout") from e
     except Exception as e:
         logger.error(
             "chat_error",
             request_id=request_id,
             error_type=type(e).__name__,
-            error_message=str(e)
+            error_message=str(e),
         )
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
+
 
 # Streaming Chat Endpoint (Fixed)
 
@@ -311,43 +407,45 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
     """Streaming chat endpoint for real-time responses."""
     request_id = str(uuid.uuid4())
 
-    async def generate_stream():
+    async def generate_stream() -> AsyncGenerator[str, None]:
         try:
             if not chat_request.messages:
-                yield "data: {\"error\": \"No messages provided\"}\n\n"
+                yield 'data: {"error": "No messages provided"}\n\n'
                 return
 
             for message in chat_request.messages:
                 validate_message(message)
 
             trimmed_messages = trim_conversation(
-                chat_request.messages,
-                settings.max_conversation_tokens
+                chat_request.messages, settings.max_conversation_tokens
             )
 
-            openai_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            openai_messages: List[Dict[str, str]] = [
+                {"role": "system", "content": SYSTEM_PROMPT}
+            ]
             for msg in trimmed_messages:
                 openai_messages.append({"role": msg.role, "content": msg.content})
 
             stream = await client.chat.completions.create(
                 model=settings.model_name,
-                messages=openai_messages,
+                messages=openai_messages,  # type: ignore
                 temperature=settings.temperature,
                 max_tokens=settings.max_tokens,
                 stream=True,
-                user=request_id
+                user=request_id,
             )
 
             async for chunk in stream:
                 # Enhanced null safety checks
-                if (chunk and
-                    hasattr(chunk, 'choices') and
-                    chunk.choices and
-                    len(chunk.choices) > 0 and
-                    chunk.choices[0].delta and
-                    hasattr(chunk.choices[0].delta, 'content') and
-                        chunk.choices[0].delta.content is not None):
-
+                if (
+                    chunk
+                    and hasattr(chunk, "choices")
+                    and chunk.choices
+                    and len(chunk.choices) > 0
+                    and chunk.choices[0].delta
+                    and hasattr(chunk.choices[0].delta, "content")
+                    and chunk.choices[0].delta.content is not None
+                ):
                     content = chunk.choices[0].delta.content
                     yield f"data: {json.dumps({'content': content, 'request_id': request_id})}\n\n"
 
@@ -355,6 +453,15 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
 
         except HTTPException as e:
             yield f"data: {json.dumps({'error': e.detail})}\n\n"
+        except ValueError as e:
+            logger.error("stream_validation_error", request_id=request_id, error=str(e))
+            yield f"data: {json.dumps({'error': 'Invalid request data'})}\n\n"
+        except ConnectionError as e:
+            logger.error("stream_connection_error", request_id=request_id, error=str(e))
+            yield f"data: {json.dumps({'error': 'Service temporarily unavailable'})}\n\n"
+        except TimeoutError as e:
+            logger.error("stream_timeout_error", request_id=request_id, error=str(e))
+            yield f"data: {json.dumps({'error': 'Request timeout'})}\n\n"
         except Exception as e:
             logger.error("stream_error", request_id=request_id, error=str(e))
             yield f"data: {json.dumps({'error': 'Internal server error'})}\n\n"
@@ -370,52 +477,72 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
                 "Access-Control-Allow-Origin": "*",
-            }
+            },
         )
-
+    except ValueError as e:
+        logger.error(
+            "stream_setup_validation_error", request_id=request_id, error=str(e)
+        )
+        raise HTTPException(status_code=400, detail="Invalid stream request") from e
+    except ConnectionError as e:
+        logger.error(
+            "stream_setup_connection_error", request_id=request_id, error=str(e)
+        )
+        raise HTTPException(
+            status_code=503, detail="Service temporarily unavailable"
+        ) from e
     except Exception as e:
         logger.error("stream_setup_error", request_id=request_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Stream setup failed")
+        raise HTTPException(status_code=500, detail="Stream setup failed") from e
+
 
 # Health Check (Fixed)
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, Any]:
     """Comprehensive health check including OpenAI connectivity."""
-    health_status = {
+    health_status: Dict[str, Any] = {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "version": "2.0.0",
-        "services": {}
+        "services": {},
     }
 
     try:
         # Test OpenAI connectivity with timeout
-        import asyncio
-        models = await asyncio.wait_for(client.models.list(), timeout=5.0)
+        _ = await asyncio.wait_for(client.models.list(), timeout=5.0)
         health_status["services"]["openai"] = {
             "status": "connected",
-            "model": settings.model_name
+            "model": settings.model_name,
         }
     except asyncio.TimeoutError:
         health_status["status"] = "degraded"
         health_status["services"]["openai"] = {
             "status": "timeout",
-            "error": "OpenAI API request timed out"
+            "error": "OpenAI API request timed out",
         }
-    except Exception as e:
+    except ValueError as e:
+        health_status["status"] = "degraded"
+        health_status["services"]["openai"] = {
+            "status": "invalid_configuration",
+            "error": str(e),
+        }
+    except ConnectionError as e:
         health_status["status"] = "degraded"
         health_status["services"]["openai"] = {
             "status": "disconnected",
-            "error": str(e)
+            "error": str(e),
         }
+    except Exception as e:
+        health_status["status"] = "degraded"
+        health_status["services"]["openai"] = {"status": "error", "error": str(e)}
 
     return health_status
 
 
 @app.get("/")
-async def root():
+async def root() -> Dict[str, Any]:
     return {
         "name": "Wh0Dini-AI",
         "version": "2.0.0",
@@ -424,8 +551,8 @@ async def root():
             "chat": "/chat",
             "stream": "/chat/stream",
             "health": "/health",
-            "docs": "/docs"
-        }
+            "docs": "/docs",
+        },
     }
 
 
@@ -436,39 +563,66 @@ async def chat_ui():
         static_path = "static/index.html"
         if not os.path.exists(static_path):
             return HTMLResponse(
-                content="""
+                content=""",
                 <!DOCTYPE html>
                 <html>
                 <head><title>Wh0Dini-AI</title></head>
                 <body>
                     <h1>Wh0Dini-AI Chat Interface</h1>
                     <p>Chat UI not found. Please create static/index.html</p>
-                    <p>Use the API at <a href="/docs">/docs</a> for testing.</p>
+                    <p>Use the API at <a href=\"/docs\">/docs</a> for testing.</p>
                 </body>
                 </html>
                 """,
-                status_code=200
+                status_code=200,
             )
-
         with open(static_path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read(), status_code=200)
+    except FileNotFoundError as e:
+        logger.error("chat_ui_file_not_found", error=str(e))
+        raise HTTPException(
+            status_code=404, detail="Chat interface file not found"
+        ) from e
+    except PermissionError as e:
+        logger.error("chat_ui_permission_error", error=str(e))
+        raise HTTPException(
+            status_code=403, detail="Permission denied accessing chat interface"
+        ) from e
+    except UnicodeDecodeError as e:
+        logger.error("chat_ui_encoding_error", error=str(e))
+        raise HTTPException(
+            status_code=500, detail="Failed to decode chat interface file"
+        ) from e
     except Exception as e:
         logger.error("chat_ui_error", error=str(e))
-        raise HTTPException(status_code=500, detail="Failed to load chat interface")
+        raise HTTPException(
+            status_code=500, detail="Failed to load chat interface"
+        ) from e
+
 
 if __name__ == "__main__":
     try:
         import uvicorn
+
         uvicorn.run(
             "Wh0Dini_AI_main:app",
             host=settings.api_host,
             port=settings.api_port,
             reload=settings.reload,
-            log_level=settings.log_level.lower()
+            log_level=settings.log_level.lower(),
         )
     except ImportError:
         print(
-            "Error: uvicorn is not installed. Please install it with: pip install uvicorn[standard]")
+            "Error: uvicorn is not installed. Please install it with: pip install uvicorn[standard]"
+        )
+        exit(1)
+    except ValueError as e:
+        logger.error("startup_configuration_error", error=str(e))
+        print(f"Configuration error: {e}")
+        exit(1)
+    except OSError as e:
+        logger.error("startup_network_error", error=str(e))
+        print(f"Network error (port may be in use): {e}")
         exit(1)
     except Exception as e:
         logger.error("startup_error", error=str(e))
