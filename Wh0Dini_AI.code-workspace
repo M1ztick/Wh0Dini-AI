@@ -27,7 +27,8 @@
 			"**/.pytest_cache": true,
 			"**/.coverage": true
 		},
-		"makefile.configureOnOpen": false
+		"makefile.configureOnOpen": false,
+		"CodeGPT.apiKey": "CodeGPT Plus Beta"
 	},
 	"extensions": {
 		"recommendations": [
@@ -38,7 +39,9 @@
 			"ms-toolsai.jupyter",
 			"humao.rest-client",
 			"ms-vscode.vscode-json",
-			"redhat.vscode-yaml"
+			"redhat.vscode-yaml",
+			"sindujaramaraj.app-developer-copilot",
+			"danielsanmedium.dscodegpt"
 		]
 	},
 	"launch": {
