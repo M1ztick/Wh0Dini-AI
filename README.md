@@ -1,15 +1,31 @@
-# Wh0Dini-AI 🎭
+# Wh0Dini-AI 🎭  
+*A GPT-powered FastAPI chatbot with a privacy-first, white-box architecture.*
 
-A privacy-first FastAPI chatbot assistant powered by GPT-4o-mini that delivers intelligent conversations without compromising user data or identity.
+![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+![FastAPI](https://img.shields.io/badge/built%20with-FastAPI-009688.svg)
+
+---
+
+## Overview 🌐
+
+**Wh0Dini-AI** is a fully transparent, privacy-first chatbot powered by OpenAI's GPT-4o-mini model and built using FastAPI. It’s designed to deliver intelligent conversations *without tracking, logging, or compromising user data*. The project is a direct expression of **Mistyk Media’s** core philosophy: *user-centric development that safeguards personal information rather than exploiting it*.
+
+Both this project and Mistyk Media’s broader approach champion what we call a **"white-box" (or “clear-glass”) development strategy** — an open, honest methodology where *every line of code and configuration is public*, with nothing hidden behind proprietary walls.
+
+---
 
 ## Features ✨
 
-- **Privacy-First**: No data logging or storage of personal information
-- **Fast & Efficient**: Built with FastAPI for high performance
-- **Rate Limited**: Built-in protection against abuse
-- **Modern UI**: Clean, responsive web interface
-- **Easy Deployment**: Docker-ready with dev container support
-- **Comprehensive Testing**: Full test suite with coverage reporting
+- 🔒 **Privacy-First** — No user data logging or behavioral tracking.
+- ⚡ **FastAPI-Powered** — Lightning-fast backend with async support.
+- 🧠 **GPT-4o-mini** — Uses OpenAI's blazing-fast lightweight model.
+- 🔐 **Rate Limited** — Built-in abuse protection.
+- 🖥️ **Modern UI** — Sleek, responsive front-end via static assets.
+- 🐳 **Containerized** — Docker-ready with dev container config.
+- 🧪 **Tested** — Comes with full test suite and coverage support.
+
+---
 
 ## Quick Start 🚀
 
@@ -21,180 +37,180 @@ A privacy-first FastAPI chatbot assistant powered by GPT-4o-mini that delivers i
 
 ### Installation
 
-1. **Clone the repository**
-
-   ```bash
-   git clone <repository-url>
-   cd Wh0Dini-AI
-   ```
-
-2. **Set up the environment**
-
-   ```bash
-   # Option 1: Use the setup script
-   chmod +x setup.sh
-   ./setup.sh
-
-   # Option 2: Use Makefile
-   make setup
-
-   # Option 3: Manual setup
-   pip install -r requirements.txt
-   cp .env.example .env
-   ```
-
-3. **Configure your API key**
-
-   Edit `.env` file and add your OpenAI API key:
-
-   ```env
-   OPENAI_API_KEY=your_actual_api_key_here
-   ```
-
-4. **Run the application**
-
-   ```bash
-   # Option 1: Direct Python
-   python main.py
-
-   # Option 2: Using Makefile
-   make run
-
-   # Option 3: Using uvicorn directly
-   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-   ```
-
-5. **Visit the application**
-   Open your browser and go to: <http://localhost:8000>
-
-## Development 🛠️
-
-### Available Commands
-
-Use the Makefile for common development tasks:
-
 ```bash
-make help          # Show all available commands
-make install       # Install dependencies
-make dev           # Install development dependencies
-make run           # Start the server
-make test          # Run tests with coverage
-make format        # Format code with black and isort
-make lint          # Run linting checks
-make type-check    # Run mypy type checking
-make clean         # Clean up cache files
-make check         # Run all checks (format, lint, type-check, test)
+git clone https://github.com/YOUR-USERNAME/Wh0Dini-AI.git
+cd Wh0Dini-AI
 ```
 
-### Project Structure
+#### Set Up the Environment
+
+Choose one setup method:
+
+```bash
+# Setup script
+chmod +x setup.sh && ./setup.sh
+
+# OR with Makefile
+make setup
+
+# OR manually
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Edit `.env` and insert your API key:
+
+```env
+OPENAI_API_KEY=your_actual_api_key_here
+```
+
+#### Run the App
+
+```bash
+# Option 1: Python
+python main.py
+
+# Option 2: Uvicorn
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# Option 3: Makefile
+make run
+```
+
+Open your browser: [http://localhost:8000](http://localhost:8000)
+
+---
+
+## Project Structure 🗂️
 
 ```
 Wh0Dini-AI/
-├── main.py                 # Application entry point
-├── Wh0Dini_AI_main.py     # Core FastAPI application
-├── static/                 # Static web files
+├── main.py                 # App entry point
+├── Wh0Dini_AI_main.py     # Core FastAPI app logic
+├── static/                 # HTML, CSS, JS assets
 │   ├── index.html
 │   ├── script.js
 │   └── style.css
-├── tests/                  # Test files
-├── requirements.txt        # Production dependencies
-├── requirements-dev.txt    # Development dependencies
-├── .env.example           # Environment variables template
-├── pyproject.toml         # Python project configuration
-├── Makefile              # Development commands
-└── setup.sh              # Setup script
+├── tests/                  # Test suite
+├── requirements.txt        # Runtime deps
+├── requirements-dev.txt    # Dev/test deps
+├── .env.example            # Env var template
+├── pyproject.toml          # Project config
+├── Makefile                # Dev commands
+└── setup.sh                # Setup script
 ```
 
-### Testing
+---
 
-Run tests with different options:
+## Environment Variables ⚙️
+
+| Variable          | Description                  | Default         |
+|------------------|------------------------------|-----------------|
+| `OPENAI_API_KEY` | Your OpenAI key              | **Required**    |
+| `MODEL_NAME`     | GPT model name               | `gpt-4o-mini`   |
+| `MAX_TOKENS`     | Max tokens per reply         | `500`           |
+| `RATE_LIMIT`     | Requests per minute          | `10/minute`     |
+| `API_HOST`       | App host                     | `0.0.0.0`       |
+| `API_PORT`       | App port                     | `8000`          |
+| `LOG_LEVEL`      | Logging verbosity            | `INFO`          |
+
+---
+
+## API Endpoints 📡
+
+| Endpoint         | Method | Description               |
+|------------------|--------|---------------------------|
+| `/`              | GET    | Web UI frontend           |
+| `/chat`          | POST   | Standard chat response    |
+| `/chat/stream`   | POST   | Streaming chat response   |
+| `/health`        | GET    | Health check              |
+
+---
+
+## Docker Deployment 🐳
 
 ```bash
-# Run all tests with coverage
-make test
-
-# Run quick tests without coverage
-make test-quick
-
-# Run specific test file
-pytest test_api.py -v
-
-# Run tests with live output
-pytest -v -s
+docker build -t wh0dini-ai .
+docker run -p 8000:8000 --env-file .env wh0dini-ai
 ```
 
-### Code Quality
+---
 
-The project uses several tools to maintain code quality:
+## Dev Containers (VS Code) 🧪
 
-- **Black**: Code formatting
-- **isort**: Import sorting
-- **Flake8**: Linting
-- **MyPy**: Type checking
-- **Pre-commit**: Git hooks for quality checks
+1. Open in VS Code  
+2. Install the “Dev Containers” extension  
+3. Press `Ctrl+Shift+P` → `Reopen in Container`  
+4. Magic.
 
-Set up pre-commit hooks:
+---
+
+## Development & Testing 🛠️
+
+Run commands via `make`:
+
+```bash
+make help        # List all tasks
+make dev         # Dev dependencies
+make run         # Start app
+make test        # Run tests with coverage
+make lint        # Lint with flake8
+make format      # Format with black & isort
+make type-check  # Check types with mypy
+make check       # Run all checks
+```
+
+Run tests manually:
+
+```bash
+pytest -v
+pytest tests/test_api.py
+```
+
+---
+
+## Code Quality & Tooling ✅
+
+- [`black`](https://github.com/psf/black) — Formatter  
+- [`isort`](https://pycqa.github.io/isort/) — Import sorting  
+- [`flake8`](https://flake8.pycqa.org) — Linter  
+- [`mypy`](http://mypy-lang.org) — Type checker  
+- [`pre-commit`](https://pre-commit.com) — Git hook runner
+
+Set it up:
 
 ```bash
 pip install pre-commit
 pre-commit install
 ```
 
-## Configuration ⚙️
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OPENAI_API_KEY` | Your OpenAI API key | Required |
-| `MODEL_NAME` | OpenAI model to use | `gpt-4o-mini` |
-| `MAX_TOKENS` | Maximum tokens per response | `500` |
-| `RATE_LIMIT` | Rate limit per minute | `10/minute` |
-| `API_HOST` | Server host | `0.0.0.0` |
-| `API_PORT` | Server port | `8000` |
-| `LOG_LEVEL` | Logging level | `INFO` |
-
-### API Endpoints
-
-- `GET /` - Web interface
-- `POST /chat` - Chat with the AI
-- `POST /chat/stream` - Streaming chat response
-- `GET /health` - Health check endpoint
-
-## Deployment 🚢
-
-### Using Docker
-
-```bash
-# Build the image
-docker build -t wh0dini-ai .
-
-# Run the container
-docker run -p 8000:8000 --env-file .env wh0dini-ai
-```
-
-### Using Dev Container
-
-The project includes a dev container configuration for VS Code:
-
-1. Open in VS Code
-2. Install the "Dev Containers" extension
-3. Press `Ctrl+Shift+P` and select "Dev Containers: Reopen in Container"
+---
 
 ## Contributing 🤝
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run quality checks (`make check`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+We welcome contributions!
+
+1. Fork the repo  
+2. `git checkout -b feature/amazing-idea`  
+3. Make your changes  
+4. `make check` to validate  
+5. Push and open a PR
+
+---
 
 ## License 📄
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Licensed under the [MIT License](./LICENSE).
+
+---
 
 ## Support 💬
 
-If you encounter any issues or have questions, please open an issue on GitHub.
+Have a question, bug, or feature request?  
+Open an issue on the [GitHub repo](https://github.com/YOUR-USERNAME/Wh0Dini-AI/issues).
+
+---
+
+## Screenshot 📸
+
+> *(Insert an image or GIF of the app UI here to make devs go "Ooooh")*
