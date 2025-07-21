@@ -9,7 +9,9 @@ __version__ = "1.0.0"
 __author__ = "M1ztick"
 __email__ = ""
 __license__ = "MIT"
-__description__ = "A GPT-powered FastAPI chatbot with a privacy-first, white-box architecture"
+__description__ = (
+    "A GPT-powered FastAPI chatbot with a privacy-first, white-box architecture"
+)
 
 # Import main components for easier access
 from .app import app

@@ -2,13 +2,11 @@
 Main entry point for Wh0Dini-AI application.
 """
 
-from .app import app
-
 
 def main():
     """Main entry point for the application."""
     import uvicorn
-    
+
     uvicorn.run(
         "wh0dini_ai.app:app",  # Use import string for reload to work
         host="0.0.0.0",  # Allow external connections

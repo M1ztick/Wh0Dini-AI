@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     rate_limit: str = "10/minute"
     max_message_length: int = 4000
     max_conversation_tokens: int = 3000
-    temperature: float = 0.2    # Security: Bind to localhost by default for security
+    temperature: float = 0.2  # Security: Bind to localhost by default for security
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     environment: str = "development"
