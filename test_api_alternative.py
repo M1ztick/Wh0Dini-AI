@@ -12,10 +12,13 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # Import the app module (remove unused app_module import)
 try:
-    from app import app
+    from wh0dini_ai import app
 except ImportError:
-    # Fallback to direct import if app.py doesn't exist
-    from Wh0Dini_AI_main import app
+    try:
+        from app import app
+    except ImportError:
+        # Fallback to direct import if app.py doesn't exist
+        from Wh0Dini_AI_main import app
 
 
 @pytest.fixture(scope="module")
@@ -53,7 +56,7 @@ def patch_openai_client():
         yield MockChunk("world!")
         yield MockChunk(None)  # Simulate end
 
-    mock_client.chat.completions.create.side_effect = lambda *args: Any, **kwargs: Any: (
+    mock_client.chat.completions.create.side_effect = lambda *args, **kwargs: (
         mock_stream() if kwargs.get("stream") else mock_completion
     )
 

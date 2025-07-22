@@ -12,11 +12,15 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # Single app import at module level
 try:
-    import app as app_module
-    from app import app
+    from wh0dini_ai import app
+    import wh0dini_ai.app as app_module
 except ImportError:
-    import Wh0Dini_AI_main as app_module
-    from Wh0Dini_AI_main import app
+    try:
+        import app as app_module
+        from app import app
+    except ImportError:
+        import Wh0Dini_AI_main as app_module
+        from Wh0Dini_AI_main import app
 
 
 @pytest.fixture(scope="module")

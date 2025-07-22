@@ -1,3 +1,73 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wh0dini-ai"
+version = "1.0.0"
+description = "A GPT-powered FastAPI chatbot with a privacy-first, white-box architecture"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "M1ztick"},
+]
+maintainers = [
+    {name = "M1ztick"},
+]
+keywords = [
+    "ai", "chatbot", "fastapi", "openai", "gpt", "privacy-first", "async", "python"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Communications :: Chat",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0,<0.120.0",
+    "uvicorn[standard]>=0.34.0,<0.40.0",
+    "pydantic>=2.5.0,<3.0.0",
+    "pydantic-settings>=2.0.0,<3.0.0",
+    "openai>=1.80.0,<2.0.0",
+    "tiktoken>=0.5.1,<1.0.0",
+    "slowapi>=0.1.9,<1.0.0",
+    "structlog>=25.0.0,<26.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.0,<9.0.0",
+    "pytest-anyio",
+    "anyio>=3.7.0,<5.0.0",
+    "pytest-cov>=6.0.0,<7.0.0",
+    "httpx>=0.25.0,<1.0.0",
+]
+dev = [
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/M1ztick/Wh0Dini-AI"
+Repository = "https://github.com/M1ztick/Wh0Dini-AI"
+Issues = "https://github.com/M1ztick/Wh0Dini-AI/issues"
+Documentation = "https://github.com/M1ztick/Wh0Dini-AI#readme"
+
+[project.scripts]
+wh0dini-ai = "wh0dini_ai.main:main"
+
 [tool.pytest.ini_options]
 testpaths = [
     ".",
@@ -23,7 +93,6 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
 ]
-asyncio_mode = "auto"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"

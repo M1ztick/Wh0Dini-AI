@@ -38,11 +38,24 @@ Both this project and Mistyk Media’s broader approach champion what we call a 
 ### Installation
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/Wh0Dini-AI.git
+git clone https://github.com/M1ztick/Wh0Dini-AI.git
 cd Wh0Dini-AI
 ```
 
-#### Set Up the Environment
+#### Option 1: Install as Package (Recommended for Production)
+
+```bash
+# Install the package
+pip install .
+
+# OR for development with editable install
+pip install -e .
+
+# Run using the installed command
+wh0dini-ai
+```
+
+#### Option 2: Development Setup
 
 Choose one setup method:
 
