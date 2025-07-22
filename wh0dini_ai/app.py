@@ -544,7 +544,7 @@ async def health_check() -> Dict[str, Any]:
 async def root() -> Dict[str, Any]:
     return {
         "name": "Wh0Dini-AI",
-        "version": "2.0.0",
+        "version": __version__,
         "description": "Privacy-first AI assistant that makes your data disappear like magic",
         "endpoints": {
             "chat": "/chat",
