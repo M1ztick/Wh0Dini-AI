@@ -1,0 +1,221 @@
+import asyncio
+import json
+import os
+import uuid
+from datetime import datetime
+from typing import Any, AsyncGenerator, Dict, List
+
+import structlog
+import tiktoken
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+import httpx
+
+
+class Settings(BaseSettings):
+    model_name: str = "llama3"
+    max_tokens: int = 500
+    rate_limit: str = "10/minute"
+    max_message_length: int = 4000
+    max_conversation_tokens: int = 3000
+    temperature: float = 0.2
+    api_host: str = "127.0.0.1"
+    api_port: int = 8000
+    environment: str = "development"
+    log_level: str = "INFO"
+    require_auth: bool = False
+    api_key: str = "your_secure_api_key_here"
+    allowed_origins: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://localhost:8000",
+    ]
+    rate_limit_per_minute: int = 10
+    debug: bool = True
+    reload: bool = True
+    ollama_api_url: str = "http://localhost:11434"
+
+    class ConfigDict:
+        env_file = ".env"
+
+
+settings = Settings()
+
+app = FastAPI(
+    title="Wh0Dini-AI - Privacy-first AI Assistant (Ollama)",
+    version="2.0.0",
+)
+
+SYSTEM_PROMPT = """
+You are Wh0Dini-AI, a privacy-first, user-centric AI assistant.
+
+Core Principles:
+- Always prioritize user privacy: never store or log personal data
+- Communicate clearly, respectfully, and empathetically
+- Provide helpful, relevant, and safe information
+- Avoid harmful, offensive, or biased content
+- Encourage positive and ethical use
+- Be concise but thorough in responses
+- Acknowledge limitations honestly
+"""
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.JSONRenderer(),
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
+
+logger = structlog.get_logger()
+limiter = Limiter(key_func=get_remote_address)
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return HTMLResponse(
+        content=json.dumps({"error": "Rate limit exceeded", "retry_after": 60}),
+        status_code=429,
+        headers={"Content-Type": "application/json"},
+    )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.state.limiter = limiter
+
+class Message(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: List[Message]
+    stream: bool = False
+
+class ChatResponse(BaseModel):
+    response: str
+    request_id: str
+
+def count_tokens(text: str, model: str = "llama3") -> int:
+    try:
+        encoding = tiktoken.encoding_for_model("gpt-4")
+        return len(encoding.encode(text))
+    except Exception:
+        return max(1, len(text) // 4)
+
+def trim_conversation(messages: List[Message], max_tokens: int = 3000) -> List[Message]:
+    total_tokens = 0
+    trimmed = []
+    for msg in reversed(messages):
+        tokens = count_tokens(msg.content)
+        if total_tokens + tokens > max_tokens and trimmed:
+            break
+        trimmed.insert(0, msg)
+        total_tokens += tokens
+    return trimmed
+
+def validate_message(msg: Message):
+    if msg.role not in ("user", "assistant", "system"):
+        raise HTTPException(status_code=400, detail="Invalid message role")
+    if not msg.content.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    if len(msg.content) > settings.max_message_length:
+        raise HTTPException(status_code=400, detail="Message too long")
+
+@app.post("/chat", response_model=ChatResponse)
+@limiter.limit(settings.rate_limit)
+async def chat_endpoint(request: Request, chat_request: ChatRequest):
+    request_id = str(uuid.uuid4())
+    for msg in chat_request.messages:
+        validate_message(msg)
+    trimmed = trim_conversation(chat_request.messages, settings.max_conversation_tokens)
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + [msg.dict() for msg in trimmed]
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(f"{settings.ollama_api_url}/api/chat", json={
+            "model": settings.model_name,
+            "messages": full_messages,
+            "stream": False
+        }, timeout=60.0)
+        resp.raise_for_status()
+        data = resp.json()
+        return ChatResponse(response=data["message"]["content"], request_id=request_id)
+
+@app.post("/chat/stream")
+@limiter.limit(settings.rate_limit)
+async def chat_stream(request: Request, chat_request: ChatRequest):
+    request_id = str(uuid.uuid4())
+    for msg in chat_request.messages:
+        validate_message(msg)
+    trimmed = trim_conversation(chat_request.messages, settings.max_conversation_tokens)
+    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + [msg.dict() for msg in trimmed]
+
+    async def stream_generator():
+        async with httpx.AsyncClient() as client:
+            async with client.stream("POST", f"{settings.ollama_api_url}/api/chat", json={
+                "model": settings.model_name,
+                "messages": full_messages,
+                "stream": True
+            }) as resp:
+                async for line in resp.aiter_lines():
+                    if line.startswith("data:"):
+                        content = line.removeprefix("data: ").strip()
+                        if content == "[DONE]":
+                            break
+                        try:
+                            parsed = json.loads(content)
+                            if "content" in parsed:
+                                yield f"data: {json.dumps({'content': parsed['content'], 'request_id': request_id})}\n\n"
+                        except Exception:
+                            continue
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+@app.get("/health")
+async def health_check():
+    status = {"status": "healthy", "timestamp": datetime.now().isoformat(), "version": "2.0.0", "services": {}}
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{settings.ollama_api_url}/api/tags")
+            if r.status_code == 200:
+                status["services"]["ollama"] = {"status": "connected"}
+            else:
+                status["services"]["ollama"] = {"status": "unreachable"}
+    except Exception as e:
+        status["status"] = "degraded"
+        status["services"]["ollama"] = {"status": "error", "detail": str(e)}
+    return status
+
+@app.get("/")
+async def root():
+    return {
+        "name": "Wh0Dini-AI",
+        "version": "2.0.0",
+        "description": "Privacy-first AI assistant powered by Ollama",
+        "endpoints": {"chat": "/chat", "stream": "/chat/stream", "health": "/health"}
+    }
